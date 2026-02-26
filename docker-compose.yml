@@ -1,0 +1,52 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: eshtehard_db
+    environment:
+      POSTGRES_USER: eshtehard
+      POSTGRES_PASSWORD: eshtehard_pass
+      POSTGRES_DB: eshtehard
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U eshtehard']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: eshtehard_backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://eshtehard:eshtehard_pass@postgres:5432/eshtehard
+      JWT_ACCESS_SECRET: change_me_access_secret_32chars
+      JWT_REFRESH_SECRET: change_me_refresh_secret_32chars
+      JWT_ACCESS_EXPIRY: 15m
+      JWT_REFRESH_EXPIRY: 7d
+      KAVENEGAR_API_KEY: your_kavenegar_api_key
+      PORT: 4000
+      NODE_ENV: production
+    ports:
+      - '4000:4000'
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: eshtehard_frontend
+    depends_on:
+      - backend
+    ports:
+      - '3000:80'
+
+volumes:
+  pgdata:

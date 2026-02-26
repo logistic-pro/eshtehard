@@ -1,0 +1,396 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  DRIVER
+  FREIGHT_COMPANY
+  PRODUCER
+  TERMINAL_ADMIN
+}
+
+enum CargoStatus {
+  DRAFT
+  SUBMITTED
+  ACCEPTED_BY_FREIGHT
+  ANNOUNCED_TO_HALL
+  DRIVER_ASSIGNED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum VehicleType {
+  TRAILER
+  TRUCK
+  PICKUP
+  VAN
+  REFRIGERATED
+  TANKER
+  FLATBED
+}
+
+enum FleetOwnership {
+  OWNED
+  LEASED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum UserStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+}
+
+model User {
+  id           String     @id @default(uuid())
+  phone        String     @unique
+  name         String
+  nationalCode String?    @unique
+  role         Role
+  status       UserStatus @default(PENDING)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  refreshTokens      RefreshToken[]
+  driverProfile      DriverProfile?
+  freightProfile     FreightCompanyProfile?
+  producerProfile    ProducerProfile?
+  terminalAdminProfile TerminalAdminProfile?
+  notifications      Notification[]
+  tickets            Ticket[]         @relation("TicketCreator")
+  ticketMessages     TicketMessage[]
+  auditLogs          AuditLog[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+  @@map("otp_codes")
+}
+
+model DriverProfile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber String?
+  licenseExpiry DateTime?
+  homeProvince  String?
+  homeCity      String?
+  freightCompanyId String?
+  freightCompany FreightCompanyProfile? @relation(fields: [freightCompanyId], references: [id])
+  isVerified      Boolean   @default(false)
+  cancelBanUntil  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  vehicles      Vehicle[]
+  appointments  Appointment[]
+
+  @@map("driver_profiles")
+}
+
+model FreightCompanyProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName     String
+  registrationNo  String?
+  province        String?
+  city            String?
+  isVerified      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  drivers         DriverProfile[]
+  cargo           Cargo[]         @relation("FreightCargo")
+  announcements   HallAnnouncement[]
+  appointments    Appointment[]   @relation("FreightAppointment")
+
+  @@map("freight_company_profiles")
+}
+
+model ProducerProfile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName    String
+  registrationNo String?
+  province       String?
+  city           String?
+  isVerified     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  cargo          Cargo[]  @relation("ProducerCargo")
+
+  @@map("producer_profiles")
+}
+
+model TerminalAdminProfile {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  terminalId String?
+  terminal   Terminal? @relation(fields: [terminalId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("terminal_admin_profiles")
+}
+
+model Terminal {
+  id        String   @id @default(uuid())
+  name      String
+  province  String
+  city      String
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  halls     Hall[]
+  admins    TerminalAdminProfile[]
+
+  @@map("terminals")
+}
+
+model Hall {
+  id           String   @id @default(uuid())
+  terminalId   String
+  terminal     Terminal @relation(fields: [terminalId], references: [id])
+  name         String
+  province     String
+  shift        String?
+  capacity     Int      @default(100)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  announcements HallAnnouncement[]
+
+  @@map("halls")
+}
+
+model Cargo {
+  id              String      @id @default(uuid())
+  referenceCode   String      @unique @default(cuid())
+  producerId      String
+  producer        ProducerProfile @relation("ProducerCargo", fields: [producerId], references: [id])
+  freightId       String?
+  freight         FreightCompanyProfile? @relation("FreightCargo", fields: [freightId], references: [id])
+  originProvince  String
+  originCity      String
+  destProvince    String
+  destCity        String
+  cargoType       String
+  weight          Float
+  unit            String      @default("تن")
+  fare            Float?
+  description     String?
+  status          CargoStatus @default(DRAFT)
+  isUrgent        Boolean     @default(false)
+  loadingDateTime DateTime?
+  truckCount      Int         @default(1)
+  rejectionNote   String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  statusHistory   CargoStatusHistory[]
+  announcements   HallAnnouncement[]
+  appointments    Appointment[]
+  waybills        Waybill[]
+
+  @@index([status])
+  @@index([originProvince])
+  @@index([freightId])
+  @@index([producerId])
+  @@map("cargo")
+}
+
+model CargoStatusHistory {
+  id        String      @id @default(uuid())
+  cargoId   String
+  cargo     Cargo       @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  fromStatus CargoStatus?
+  toStatus  CargoStatus
+  note      String?
+  changedBy String?
+  createdAt DateTime    @default(now())
+
+  @@map("cargo_status_history")
+}
+
+model HallAnnouncement {
+  id          String   @id @default(uuid())
+  cargoId     String
+  cargo       Cargo    @relation(fields: [cargoId], references: [id])
+  hallId      String
+  hall        Hall     @relation(fields: [hallId], references: [id])
+  freightId   String
+  freight     FreightCompanyProfile @relation(fields: [freightId], references: [id])
+  isSuspended Boolean  @default(false)
+  suspendNote String?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  appointments Appointment[]
+
+  @@map("hall_announcements")
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  cargoId         String
+  cargo           Cargo             @relation(fields: [cargoId], references: [id])
+  driverId        String
+  driver          DriverProfile     @relation(fields: [driverId], references: [id])
+  freightId       String
+  freight         FreightCompanyProfile @relation("FreightAppointment", fields: [freightId], references: [id])
+  announcementId  String?
+  announcement    HallAnnouncement? @relation(fields: [announcementId], references: [id])
+  appointmentDate DateTime?
+  status          AppointmentStatus @default(PENDING)
+  smsSent         Boolean           @default(false)
+  note            String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  waybill         Waybill?
+
+  @@map("appointments")
+}
+
+model Waybill {
+  id            String      @id @default(uuid())
+  waybillNumber String      @unique @default(cuid())
+  cargoId       String
+  cargo         Cargo       @relation(fields: [cargoId], references: [id])
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  pdfPath       String?
+  issuedAt      DateTime    @default(now())
+  createdAt     DateTime    @default(now())
+
+  @@map("waybills")
+}
+
+model Vehicle {
+  id           String         @id @default(uuid())
+  driverId     String
+  driver       DriverProfile  @relation(fields: [driverId], references: [id])
+  plate        String
+  vehicleType  VehicleType
+  ownership    FleetOwnership @default(OWNED)
+  model        String?
+  year         Int?
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([plate])
+  @@map("vehicles")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  smsSent   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+model Ticket {
+  id          String         @id @default(uuid())
+  creatorId   String
+  creator     User           @relation("TicketCreator", fields: [creatorId], references: [id])
+  subject     String
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  messages    TicketMessage[]
+
+  @@map("tickets")
+}
+
+model TicketMessage {
+  id        String   @id @default(uuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+
+  @@map("ticket_messages")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entityType String?
+  entityId   String?
+  meta       Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}

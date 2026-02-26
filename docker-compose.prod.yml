@@ -1,0 +1,52 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: eshtehard_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Not exposed externally — internal network only
+
+  backend:
+    image: ghcr.io/logistic-pro/eshtehard-backend:latest
+    container_name: eshtehard_backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
+      JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
+      KAVENEGAR_API_KEY: ${KAVENEGAR_API_KEY}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      PORT: 4000
+      NODE_ENV: production
+    # Not exposed externally — nginx proxies /api/ requests internally
+
+  frontend:
+    image: ghcr.io/logistic-pro/eshtehard-frontend:latest
+    container_name: eshtehard_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - '80:80'
+      # For SSL: use a reverse proxy (nginx + certbot) in front of this container
+      # or mount certs and expose 443 here
+
+volumes:
+  pgdata:
