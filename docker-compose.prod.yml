@@ -44,9 +44,7 @@ services:
     depends_on:
       - backend
     ports:
-      - '80:80'
-      # For SSL: use a reverse proxy (nginx + certbot) in front of this container
-      # or mount certs and expose 443 here
+      - '8000:80'
 
 volumes:
   pgdata:
