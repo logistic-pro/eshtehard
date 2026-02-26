@@ -30,7 +30,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ── Backend ──────────────────────────────────────────────────────────────
       - name: Build & push backend image
         uses: docker/build-push-action@v5
         with:
@@ -40,7 +39,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # ── Frontend ─────────────────────────────────────────────────────────────
       - name: Build & push frontend image
         uses: docker/build-push-action@v5
         with:
@@ -56,32 +54,26 @@ jobs:
     needs: build-and-push
 
     steps:
-      - name: Checkout code (for compose file)
-        uses: actions/checkout@v4
-
-      - name: Copy compose file to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: docker-compose.prod.yml
-          target: /opt/eshtehard
-
-      - name: Pull images & restart containers
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Download latest compose file from repo
+            curl -fsSL \
+              https://raw.githubusercontent.com/logistic-pro/eshtehard/main/docker-compose.prod.yml \
+              -o /opt/eshtehard/docker-compose.prod.yml
+
             cd /opt/eshtehard
 
-            # Pull latest images
-            docker compose -f docker-compose.prod.yml pull
+            # Login to GHCR (uses GITHUB_TOKEN passed as env — or pre-logged in)
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # Restart with zero-downtime recreation
+            # Pull latest images and restart
+            docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-            # Clean up old dangling images
+            # Cleanup
             docker image prune -f
