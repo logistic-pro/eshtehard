@@ -182,12 +182,10 @@ export async function driverUpdateStatus(req: Request, res: Response, next: Next
       res.status(400).json({ message: `انتقال از ${appt.cargo.status} به ${status} مجاز نیست` }); return;
     }
 
-    // Waybill must exist before delivery
-    if (status === 'DELIVERED') {
-      const waybill = await prisma.waybill.findUnique({ where: { appointmentId: appt.id } });
-      if (!waybill) {
-        res.status(400).json({ message: 'قبل از تحویل بار، باید حواله الکترونیکی توسط باربری صادر شده باشد' }); return;
-      }
+    // Waybill must exist before driver can start moving (IN_TRANSIT) or deliver
+    const waybill = await prisma.waybill.findUnique({ where: { appointmentId: appt.id } });
+    if (!waybill) {
+      res.status(400).json({ message: 'قبل از بارگیری، باید حواله الکترونیکی توسط باربری صادر شده باشد' }); return;
     }
 
     await prisma.cargo.update({ where: { id: appt.cargoId }, data: { status } });

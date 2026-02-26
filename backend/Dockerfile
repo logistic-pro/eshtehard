@@ -18,6 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl wget \
     && mkdir -p /app/assets/fonts \
     && wget -q "https://github.com/rastikerdar/vazirmatn/raw/master/fonts/TTF/Vazirmatn-Regular.ttf" \
          -O /app/assets/fonts/Vazirmatn-Regular.ttf \
+    && wget -q "https://github.com/rastikerdar/vazirmatn/raw/master/fonts/TTF/Vazirmatn-Bold.ttf" \
+         -O /app/assets/fonts/Vazirmatn-Bold.ttf \
     || echo "Font download failed – PDF will use fallback font" \
     && apt-get purge -y wget && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*

@@ -96,7 +96,13 @@ export default function DriverAppointments() {
                 {/* Driver action buttons — status change */}
                 {a.status === 'CONFIRMED' && (
                   <Box mt={1.5} display="flex" gap={1} flexWrap="wrap">
-                    {a.cargo.status === 'DRIVER_ASSIGNED' && (
+                    {/* DRIVER_ASSIGNED: must wait for waybill before loading */}
+                    {a.cargo.status === 'DRIVER_ASSIGNED' && !a.waybill && (
+                      <Alert severity="warning" sx={{ py: 0.5, width: '100%' }}>
+                        منتظر صدور حواله توسط باربری باشید — تا صدور حواله نمی‌توانید بارگیری کنید
+                      </Alert>
+                    )}
+                    {a.cargo.status === 'DRIVER_ASSIGNED' && a.waybill && (
                       <Button size="small" variant="contained" color="warning"
                         startIcon={<LocalShippingIcon />}
                         onClick={() => statusMutation.mutate({ id: a.id, status: 'IN_TRANSIT' })}
@@ -104,18 +110,13 @@ export default function DriverAppointments() {
                         بارگیری شد / در حال حمل
                       </Button>
                     )}
-                    {a.cargo.status === 'IN_TRANSIT' && a.waybill && (
+                    {a.cargo.status === 'IN_TRANSIT' && (
                       <Button size="small" variant="contained" color="success"
                         startIcon={<CheckCircleIcon />}
                         onClick={() => statusMutation.mutate({ id: a.id, status: 'DELIVERED' })}
                         disabled={statusMutation.isPending}>
                         تحویل داده شد
                       </Button>
-                    )}
-                    {a.cargo.status === 'IN_TRANSIT' && !a.waybill && (
-                      <Typography variant="caption" color="warning.main">
-                        در انتظار صدور حواله توسط باربری...
-                      </Typography>
                     )}
                     {['DRIVER_ASSIGNED', 'IN_TRANSIT'].includes(a.cargo.status) && (
                       <Button size="small" variant="outlined" color="error"
