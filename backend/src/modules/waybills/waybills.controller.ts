@@ -6,12 +6,20 @@ import { toJalaliDateTime } from '../../utils/farsiDate';
 import fs from 'fs';
 import path from 'path';
 
-// Persian font: Tahoma on Windows dev, Vazirmatn in Docker (downloaded by Dockerfile)
 const FONT_CANDIDATES = [
   path.join(__dirname, '../../assets/fonts/Vazirmatn-Regular.ttf'), // Docker
   'C:/Windows/Fonts/tahoma.ttf',                                     // Windows dev
 ];
 const PERSIAN_FONT = FONT_CANDIDATES.find(p => fs.existsSync(p)) ?? null;
+
+// Options for RTL Persian text in PDFKit
+const RTL_OPTS = {
+  align: 'right' as const,
+  direction: 'rtl',
+  script: 'arab',
+  language: 'FAR',
+  lineBreak: false,
+};
 
 export async function createWaybill(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -97,58 +105,96 @@ export async function getWaybillPdf(req: Request, res: Response, next: NextFunct
     res.setHeader('Content-Disposition', `attachment; filename=waybill-${waybill.waybillNumber}.pdf`);
     doc.pipe(res);
 
-    if (PERSIAN_FONT) { try { doc.registerFont('Persian', PERSIAN_FONT); } catch { /* ignore */ } }
-    const useFont = (size: number) => {
-      if (PERSIAN_FONT) { try { doc.font('Persian').fontSize(size); return; } catch { /* ignore */ } }
-      doc.fontSize(size);
+    let fontLoaded = false;
+    if (PERSIAN_FONT) {
+      try {
+        doc.registerFont('Persian', PERSIAN_FONT);
+        fontLoaded = true;
+      } catch { /* ignore */ }
+    }
+
+    const setFont = (size: number) => {
+      if (fontLoaded) doc.font('Persian').fontSize(size);
+      else doc.fontSize(size);
     };
 
-    // Helper: right-align Persian text (RTL)
-    const rtl = (text: string) => ({ align: 'right' as const, features: ['rtla'] });
+    const pageWidth = doc.page.width;
+    const margin = 50;
+    const contentWidth = pageWidth - margin * 2;
 
-    useFont(18);
-    doc.text('حواله الکترونیکی بار', { align: 'center' });
-    doc.moveDown(0.5);
-
-    // Separator line
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
-
-    useFont(12);
-    const row = (label: string, val: string) => {
-      doc.text(`${val}  :${label}`, { align: 'right', features: ['rtla'] });
+    // Helper: draw a row with label on LEFT (LTR) and RTL value on RIGHT
+    const row = (label: string, value: string) => {
+      const y = doc.y;
+      // Draw label left-aligned (LTR, monospace-friendly)
+      setFont(11);
+      doc.fillColor('#555').text(label + ':', margin, y, { width: 150, align: 'left', lineBreak: false });
+      // Draw value right-aligned with RTL options
+      doc.fillColor('#111').text(value, margin + 155, y, { width: contentWidth - 155, ...RTL_OPTS });
+      doc.moveDown(0.6);
     };
 
-    row('شماره حواله', waybill.waybillNumber);
-    row('کد مرجع بار', waybill.cargo.referenceCode);
-    row('نوع بار', waybill.cargo.cargoType);
-    row('وزن', `${waybill.cargo.weight} ${waybill.cargo.unit}`);
-    row('مبدأ', `${waybill.cargo.originProvince} - ${waybill.cargo.originCity}`);
-    row('مقصد', `${waybill.cargo.destProvince} - ${waybill.cargo.destCity}`);
-    if (waybill.cargo.fare) row('کرایه', `${waybill.cargo.fare.toLocaleString()} ریال`);
+    const separator = () => {
+      doc.moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).strokeColor('#ccc').stroke();
+      doc.moveDown(0.5);
+    };
+
+    // --- Title ---
+    setFont(20);
+    doc.fillColor('#1a237e').text('حواله الکترونیکی بار', margin, 50, { width: contentWidth, ...RTL_OPTS });
+    doc.moveDown(0.3);
+    doc.moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).strokeColor('#1a237e').lineWidth(2).stroke();
+    doc.lineWidth(1);
+    doc.moveDown(0.8);
+
+    // --- Cargo info ---
+    setFont(13);
+    doc.fillColor('#333').text('اطلاعات بار', margin, doc.y, { width: contentWidth, ...RTL_OPTS });
+    doc.moveDown(0.4);
+    separator();
+
+    setFont(11);
+    row('Waybill No', waybill.waybillNumber);
+    row('Ref Code', waybill.cargo.referenceCode);
+    row('Cargo Type', waybill.cargo.cargoType);
+    row('Weight', `${waybill.cargo.weight} ${waybill.cargo.unit}`);
+    row('Origin', `${waybill.cargo.originProvince} - ${waybill.cargo.originCity}`);
+    row('Destination', `${waybill.cargo.destProvince} - ${waybill.cargo.destCity}`);
+    if (waybill.cargo.fare) row('Fare (IRR)', waybill.cargo.fare.toLocaleString());
 
     doc.moveDown(0.5);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
+    separator();
 
-    row('نام راننده', waybill.appointment.driver.user.name);
-    row('تلفن راننده', waybill.appointment.driver.user.phone);
+    // --- Driver info ---
+    setFont(13);
+    doc.fillColor('#333').text('اطلاعات راننده', margin, doc.y, { width: contentWidth, ...RTL_OPTS });
+    doc.moveDown(0.4);
+    separator();
+
+    setFont(11);
+    row('Driver', waybill.appointment.driver.user.name);
+    row('Phone', waybill.appointment.driver.user.phone);
     if (waybill.appointment.driver.vehicles[0]) {
-      row('پلاک خودرو', waybill.appointment.driver.vehicles[0].plate);
-      row('نوع خودرو', waybill.appointment.driver.vehicles[0].vehicleType);
+      row('Plate', waybill.appointment.driver.vehicles[0].plate);
+      row('Vehicle', waybill.appointment.driver.vehicles[0].vehicleType);
     }
 
     doc.moveDown(0.5);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
+    separator();
 
-    row('تاریخ صدور حواله', toJalaliDateTime(waybill.issuedAt));
-    row('تاریخ نوبت بارگیری', waybill.appointment.appointmentDate
+    // --- Dates ---
+    setFont(13);
+    doc.fillColor('#333').text('تاریخ‌ها', margin, doc.y, { width: contentWidth, ...RTL_OPTS });
+    doc.moveDown(0.4);
+    separator();
+
+    setFont(11);
+    row('Issued', toJalaliDateTime(waybill.issuedAt));
+    row('Loading', waybill.appointment.appointmentDate
       ? toJalaliDateTime(waybill.appointment.appointmentDate) : '-');
 
-    doc.moveDown(1);
-    useFont(10);
-    doc.text('سامانه مدیریت پایانه بار اشتهارد', { align: 'center' });
+    doc.moveDown(1.5);
+    setFont(9);
+    doc.fillColor('#999').text('سامانه مدیریت پایانه بار اشتهارد', margin, doc.y, { width: contentWidth, align: 'center' });
 
     doc.end();
   } catch (err) { next(err); }

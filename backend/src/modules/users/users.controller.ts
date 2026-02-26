@@ -98,7 +98,79 @@ export async function deleteUser(req: Request, res: Response, next: NextFunction
     if (req.params.id === req.user.userId) {
       res.status(400).json({ message: 'نمی‌توانید حساب خودتان را حذف کنید' }); return;
     }
-    await prisma.user.delete({ where: { id: req.params.id } });
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      include: { driverProfile: true, freightProfile: true, producerProfile: true },
+    });
+    if (!user) { res.status(404).json({ message: 'کاربر یافت نشد' }); return; }
+
+    await prisma.$transaction(async (tx) => {
+      // --- DRIVER: delete vehicles + appointments + their waybills ---
+      if (user.driverProfile) {
+        const driverAppts = await tx.appointment.findMany({
+          where: { driverId: user.driverProfile.id }, select: { id: true },
+        });
+        if (driverAppts.length) {
+          await tx.waybill.deleteMany({ where: { appointmentId: { in: driverAppts.map(a => a.id) } } });
+          await tx.appointment.deleteMany({ where: { driverId: user.driverProfile.id } });
+        }
+        await tx.vehicle.deleteMany({ where: { driverId: user.driverProfile.id } });
+      }
+
+      // --- FREIGHT: delete appointments/waybills/announcements; nullify cargo freightId ---
+      if (user.freightProfile) {
+        const freightAppts = await tx.appointment.findMany({
+          where: { freightId: user.freightProfile.id }, select: { id: true },
+        });
+        if (freightAppts.length) {
+          await tx.waybill.deleteMany({ where: { appointmentId: { in: freightAppts.map(a => a.id) } } });
+          await tx.appointment.deleteMany({ where: { freightId: user.freightProfile.id } });
+        }
+        await tx.hallAnnouncement.deleteMany({ where: { freightId: user.freightProfile.id } });
+        await tx.cargo.updateMany({
+          where: { freightId: user.freightProfile.id },
+          data: { freightId: null, status: 'SUBMITTED' },
+        });
+      }
+
+      // --- PRODUCER: delete all cargo + related records ---
+      if (user.producerProfile) {
+        const producerCargo = await tx.cargo.findMany({
+          where: { producerId: user.producerProfile.id }, select: { id: true },
+        });
+        if (producerCargo.length) {
+          const cargoIds = producerCargo.map(c => c.id);
+          const cargoAppts = await tx.appointment.findMany({
+            where: { cargoId: { in: cargoIds } }, select: { id: true },
+          });
+          if (cargoAppts.length) {
+            await tx.waybill.deleteMany({ where: { appointmentId: { in: cargoAppts.map(a => a.id) } } });
+            await tx.appointment.deleteMany({ where: { cargoId: { in: cargoIds } } });
+          }
+          await tx.hallAnnouncement.deleteMany({ where: { cargoId: { in: cargoIds } } });
+          await tx.cargoStatusHistory.deleteMany({ where: { cargoId: { in: cargoIds } } });
+          await tx.cargo.deleteMany({ where: { producerId: user.producerProfile.id } });
+        }
+      }
+
+      // --- Tickets and messages ---
+      const userTickets = await tx.ticket.findMany({
+        where: { creatorId: req.params.id }, select: { id: true },
+      });
+      if (userTickets.length) {
+        await tx.ticketMessage.deleteMany({ where: { ticketId: { in: userTickets.map(t => t.id) } } });
+        await tx.ticket.deleteMany({ where: { creatorId: req.params.id } });
+      }
+      await tx.ticketMessage.deleteMany({ where: { senderId: req.params.id } });
+
+      // --- Nullify optional audit log references ---
+      await tx.auditLog.updateMany({ where: { userId: req.params.id }, data: { userId: null } });
+
+      // --- Delete user (cascade: refreshTokens, notifications, profiles) ---
+      await tx.user.delete({ where: { id: req.params.id } });
+    });
+
     res.json({ message: 'کاربر حذف شد' });
   } catch (err) { next(err); }
 }
