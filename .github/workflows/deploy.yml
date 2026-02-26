@@ -60,6 +60,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: GHCR_TOKEN
           script: |
             # Download latest compose file from repo
             curl -fsSL \
@@ -68,8 +69,8 @@ jobs:
 
             cd /opt/eshtehard
 
-            # Login to GHCR (uses GITHUB_TOKEN passed as env — or pre-logged in)
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            # Login to GHCR using token passed as env var
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u alireza1598 --password-stdin
 
             # Pull latest images and restart
             docker-compose -f docker-compose.prod.yml pull
@@ -77,3 +78,5 @@ jobs:
 
             # Cleanup
             docker image prune -f
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
