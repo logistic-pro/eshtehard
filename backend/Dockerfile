@@ -13,12 +13,12 @@ RUN npm run build
 FROM node:20-slim
 WORKDIR /app
 
-# Install wget + download Vazirmatn font for Persian PDF generation
-RUN apt-get update && apt-get install -y --no-install-recommends wget \
+# Install openssl (required by Prisma) + wget for Vazirmatn font
+RUN apt-get update && apt-get install -y --no-install-recommends openssl wget \
     && mkdir -p /app/assets/fonts \
     && wget -q "https://github.com/rastikerdar/vazirmatn/raw/master/fonts/TTF/Vazirmatn-Regular.ttf" \
          -O /app/assets/fonts/Vazirmatn-Regular.ttf \
-    || echo "⚠ Font download failed – PDF will use fallback font" \
+    || echo "Font download failed – PDF will use fallback font" \
     && apt-get purge -y wget && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
