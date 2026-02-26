@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getMe, updateMe, listUsers, getUserById, createUser, updateUser } from './users.controller';
+import { getMe, updateMe, listUsers, getUserById, createUser, updateUser, deleteUser } from './users.controller';
 import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 
@@ -13,5 +13,6 @@ router.get('/', requireRole('TERMINAL_ADMIN'), listUsers);
 router.post('/', requireRole('TERMINAL_ADMIN'), createUser);
 router.get('/:id', requireRole('TERMINAL_ADMIN'), getUserById);
 router.put('/:id', requireRole('TERMINAL_ADMIN'), updateUser);
+router.delete('/:id', requireRole('TERMINAL_ADMIN'), deleteUser);
 
 export default router;

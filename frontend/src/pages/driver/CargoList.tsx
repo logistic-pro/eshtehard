@@ -19,6 +19,7 @@ export default function DriverCargoList() {
   const { data, isLoading } = useQuery({
     queryKey: ['cargo', 'driver', page, search],
     queryFn: () => cargoService.list({ page: String(page), limit: '12', ...(search ? { province: search } : {}) }),
+    refetchInterval: 15000,
   });
 
   const requestMutation = useMutation({

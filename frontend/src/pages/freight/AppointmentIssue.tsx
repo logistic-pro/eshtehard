@@ -48,6 +48,7 @@ export default function FreightAppointmentIssue() {
     queryKey: ['cargo', 'freight', 'announced'],
     queryFn: () => cargoService.list({ status: 'ANNOUNCED_TO_HALL', limit: '50' }),
     enabled: tab === 'cargos',
+    refetchInterval: 15000,
   });
 
   // Driver requests for selected cargo
@@ -62,6 +63,7 @@ export default function FreightAppointmentIssue() {
     queryKey: ['appointments', 'freight', 'confirmed'],
     queryFn: () => appointmentsService.list({ status: 'CONFIRMED', limit: '50' }),
     enabled: tab === 'confirmed',
+    refetchInterval: 15000,
   });
 
   const approveMutation = useMutation({

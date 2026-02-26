@@ -26,6 +26,7 @@ export default function TerminalCargoMonitor() {
       ...(status ? { status } : {}),
       ...(province ? { province } : {}),
     }),
+    refetchInterval: 15000,
   });
 
   const items = data?.data?.items ?? [];

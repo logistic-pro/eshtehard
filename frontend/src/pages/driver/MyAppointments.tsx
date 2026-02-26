@@ -25,6 +25,7 @@ export default function DriverAppointments() {
   const { data, isLoading } = useQuery({
     queryKey: ['appointments', 'driver'],
     queryFn: () => appointmentsService.list(),
+    refetchInterval: 10000,
   });
 
   const statusMutation = useMutation({

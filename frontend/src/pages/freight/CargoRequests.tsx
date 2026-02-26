@@ -27,6 +27,7 @@ export default function FreightCargoRequests() {
   const { data, isLoading } = useQuery({
     queryKey: ['cargo', 'freight', page],
     queryFn: () => cargoService.list({ page: String(page), limit: '15' }),
+    refetchInterval: 15000,
   });
 
   const acceptMutation = useMutation({

@@ -92,3 +92,13 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
     res.json(user);
   } catch (err) { next(err); }
 }
+
+export async function deleteUser(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (req.params.id === req.user.userId) {
+      res.status(400).json({ message: 'نمی‌توانید حساب خودتان را حذف کنید' }); return;
+    }
+    await prisma.user.delete({ where: { id: req.params.id } });
+    res.json({ message: 'کاربر حذف شد' });
+  } catch (err) { next(err); }
+}

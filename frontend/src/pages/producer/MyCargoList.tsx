@@ -27,6 +27,7 @@ export default function MyCargoList() {
   const { data, isLoading } = useQuery({
     queryKey: ['cargo', 'producer', page, status],
     queryFn: () => cargoService.list({ page: String(page), limit: '15', ...(status ? { status } : {}) }),
+    refetchInterval: 15000,
   });
 
   const cancelMutation = useMutation({
