@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { toJalaliDateTime } from '../../utils/farsiDate';
 import fs from 'fs';
 import path from 'path';
+import PDFDocument from 'pdfkit';
 
 const FONT_DIR = path.join(process.cwd(), 'assets/fonts');
 const REGULAR = path.join(FONT_DIR, 'Vazirmatn-Regular.ttf');
@@ -105,102 +106,76 @@ export async function getWaybillPdf(req: Request, res: Response, next: NextFunct
 
     const regularExists = fs.existsSync(REGULAR);
     const boldExists    = fs.existsSync(BOLD);
+    if (!regularExists) { res.status(500).json({ message: `فونت یافت نشد: ${REGULAR}` }); return; }
 
-    if (!regularExists) {
-      res.status(500).json({ message: `فونت PDF یافت نشد (${REGULAR})` }); return;
-    }
-
-    // Use server-side PdfPrinter — pdfmake/src/printer reads from filesystem
-    // require('pdfmake') resolves to build/pdfmake.js (browser VFS build) and crashes
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const PdfPrinter = require('pdfmake/src/printer');
-    const printer = new PdfPrinter({
-      Vazirmatn: {
-        normal:      REGULAR,
-        bold:        boldExists ? BOLD : REGULAR,
-        italics:     REGULAR,
-        bolditalics: boldExists ? BOLD : REGULAR,
-      },
-    });
-
-    const cargo   = waybill.cargo;
-    const driver  = waybill.appointment.driver;
+    const cargo  = waybill.cargo;
+    const driver = waybill.appointment.driver;
     const vehicle = driver.vehicles[0];
+    const boldFont = boldExists ? BOLD : REGULAR;
 
-    const R = 'right' as const;
-    const C = 'center' as const;
-
-    const row = (label: string, value: string) => ({
-      columns: [
-        { text: value, alignment: R, width: '*' },
-        { text: label, alignment: R, bold: true, color: '#444', width: 130 },
-      ],
-      columnGap: 10,
-      margin: [0, 3, 0, 3] as [number, number, number, number],
-    });
-
-    const divider = {
-      canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#ccc' }],
-      margin: [0, 6, 0, 8] as [number, number, number, number],
-    };
-
-    const section = (title: string) => ({
-      text: title, fontSize: 13, bold: true, color: '#1a237e', alignment: R,
-      margin: [0, 6, 0, 4] as [number, number, number, number],
-    });
-
-    const docDef = {
-      defaultStyle: { font: 'Vazirmatn', fontSize: 11, rtl: true },
-      pageMargins: [40, 50, 40, 50] as [number, number, number, number],
-      content: [
-        { text: 'حواله الکترونیکی بار', fontSize: 20, bold: true, color: '#1a237e', alignment: C, margin: [0, 0, 0, 4] as [number, number, number, number] },
-        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 2, lineColor: '#1a237e' }], margin: [0, 0, 0, 12] as [number, number, number, number] },
-
-        section('اطلاعات بار'),
-        divider,
-        row('شماره حواله', waybill.waybillNumber),
-        row('کد مرجع', cargo.referenceCode),
-        row('نوع بار', cargo.cargoType),
-        row('وزن', `${cargo.weight} ${cargo.unit}`),
-        row('مبدأ', `${cargo.originProvince} - ${cargo.originCity}`),
-        row('مقصد', `${cargo.destProvince} - ${cargo.destCity}`),
-        ...(cargo.fare ? [row('کرایه (ریال)', cargo.fare.toLocaleString())] : []),
-        divider,
-
-        section('اطلاعات راننده'),
-        divider,
-        row('نام راننده', driver.user.name),
-        row('موبایل راننده', driver.user.phone),
-        ...(vehicle ? [
-          row('پلاک خودرو', vehicle.plate),
-          row('نوع خودرو', vehicle.vehicleType),
-        ] : []),
-        divider,
-
-        ...(cargo.producer ? [
-          section('تولیدکننده / فرستنده'),
-          divider,
-          row('نام', cargo.producer.user.name),
-          row('موبایل', cargo.producer.user.phone),
-          divider,
-        ] : []),
-
-        section('تاریخ‌ها'),
-        divider,
-        row('تاریخ صدور حواله', toJalaliDateTime(waybill.issuedAt)),
-        row('تاریخ نوبت بارگیری', waybill.appointment.appointmentDate
-          ? toJalaliDateTime(waybill.appointment.appointmentDate) : '-'),
-
-        { text: 'سامانه مدیریت پایانه بار اشتهارد', fontSize: 9, color: '#999', alignment: C, margin: [0, 30, 0, 0] as [number, number, number, number] },
-      ],
-    };
+    const doc = new PDFDocument({ size: 'A4', rtl: true, margins: { top: 50, bottom: 50, left: 40, right: 40 } });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=waybill-${waybill.waybillNumber}.pdf`);
+    doc.pipe(res);
 
-    // Stream PDF directly to response (server-side pdfmake uses pdfkit streaming)
-    const pdfDoc = printer.createPdfKitDocument(docDef);
-    pdfDoc.pipe(res);
-    pdfDoc.end();
+    doc.registerFont('Regular', REGULAR);
+    doc.registerFont('Bold', boldFont);
+
+    const W = doc.page.width - 80;
+    const L = 40; // left margin
+    const R = doc.page.width - 40; // right edge
+
+    const section = (title: string) => {
+      doc.moveDown(0.4);
+      doc.font('Bold').fontSize(12).fillColor('#1a237e').text(title, L, doc.y, { width: W, align: 'right' });
+      const y = doc.y + 2;
+      doc.moveTo(L, y).lineTo(R, y).strokeColor('#cccccc').lineWidth(0.5).stroke();
+      doc.moveDown(0.3);
+    };
+
+    const field = (label: string, value: string) => {
+      const y = doc.y;
+      doc.font('Bold').fontSize(10).fillColor('#555555')
+        .text(label, R - 130, y, { width: 125, align: 'right' });
+      doc.font('Regular').fontSize(10).fillColor('#111111')
+        .text(value, L, y, { width: W - 135, align: 'right' });
+      doc.moveDown(0.35);
+    };
+
+    // Title
+    doc.font('Bold').fontSize(20).fillColor('#1a237e').text('حواله الکترونیکی بار', L, doc.y, { width: W, align: 'center' });
+    doc.moveDown(0.3);
+    doc.moveTo(L, doc.y).lineTo(R, doc.y).strokeColor('#1a237e').lineWidth(2).stroke();
+    doc.moveDown(0.5);
+
+    section('اطلاعات بار');
+    field('شماره حواله', waybill.waybillNumber);
+    field('کد مرجع', cargo.referenceCode);
+    field('نوع بار', cargo.cargoType);
+    field('وزن', `${cargo.weight} ${cargo.unit}`);
+    field('مبدأ', `${cargo.originProvince} - ${cargo.originCity}`);
+    field('مقصد', `${cargo.destProvince} - ${cargo.destCity}`);
+    if (cargo.fare) field('کرایه (ریال)', cargo.fare.toLocaleString());
+
+    section('اطلاعات راننده');
+    field('نام راننده', driver.user.name);
+    field('موبایل راننده', driver.user.phone);
+    if (vehicle) { field('پلاک خودرو', vehicle.plate); field('نوع خودرو', vehicle.vehicleType); }
+
+    if (cargo.producer) {
+      section('تولیدکننده / فرستنده');
+      field('نام', cargo.producer.user.name);
+      field('موبایل', cargo.producer.user.phone);
+    }
+
+    section('تاریخ‌ها');
+    field('تاریخ صدور', toJalaliDateTime(waybill.issuedAt));
+    field('تاریخ نوبت', waybill.appointment.appointmentDate ? toJalaliDateTime(waybill.appointment.appointmentDate) : '-');
+
+    doc.moveDown(2);
+    doc.font('Regular').fontSize(9).fillColor('#999999').text('سامانه مدیریت پایانه بار اشتهارد', L, doc.y, { width: W, align: 'center' });
+
+    doc.end();
   } catch (err) { next(err); }
 }
