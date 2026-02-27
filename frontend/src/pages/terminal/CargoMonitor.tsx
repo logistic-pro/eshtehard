@@ -16,24 +16,25 @@ const STATUSES = ['DRAFT','SUBMITTED','ACCEPTED_BY_FREIGHT','ANNOUNCED_TO_HALL',
 
 type CargoRow = {
   id: string; referenceCode: string; cargoType: string;
-  originProvince: string; destProvince: string; weight: number; unit: string;
+  destCity: string; destProvince: string; weight: number; unit: string;
   fare?: number; status: string; loadingDateTime?: string;
   producer?: { user: { name: string; phone: string } };
   freight?: { user: { name: string } };
+  announcements?: { hall: { name: string } }[];
   appointments?: { driver: { user: { name: string; phone: string }; vehicles: { plate: string }[] } }[];
 };
 
 export default function TerminalCargoMonitor() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
-  const [province, setProvince] = useState('');
+  const [destCity, setDestCity] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['cargo', 'admin', page, status, province],
+    queryKey: ['cargo', 'admin', page, status, destCity],
     queryFn: () => cargoService.list({
       page: String(page), limit: '20',
       ...(status ? { status } : {}),
-      ...(province ? { province } : {}),
+      ...(destCity ? { destCity } : {}),
     }),
     refetchInterval: 15000,
   });
@@ -55,8 +56,8 @@ export default function TerminalCargoMonitor() {
               {STATUSES.map(s => <MenuItem key={s} value={s}>{fa[s as keyof typeof fa]}</MenuItem>)}
             </Select>
           </FormControl>
-          <TextField size="small" label="استان مبدأ" value={province}
-            onChange={e => { setProvince(e.target.value); setPage(1); }} sx={{ width: 180 }} />
+          <TextField size="small" label="شهر مقصد" value={destCity}
+            onChange={e => { setDestCity(e.target.value); setPage(1); }} sx={{ width: 180 }} />
         </Box>
       </Card>
 
@@ -68,7 +69,7 @@ export default function TerminalCargoMonitor() {
                 <TableRow sx={{ bgcolor: 'grey.50' }}>
                   <TableCell>کد مرجع</TableCell>
                   <TableCell>نوع بار</TableCell>
-                  <TableCell>مبدأ → مقصد</TableCell>
+                  <TableCell>سالن (مبدأ) → مقصد</TableCell>
                   <TableCell>وزن</TableCell>
                   <TableCell>کرایه</TableCell>
                   <TableCell>تاریخ بارگیری</TableCell>
@@ -85,7 +86,7 @@ export default function TerminalCargoMonitor() {
                   <TableRow key={c.id} hover>
                     <TableCell><Typography variant="caption" fontFamily="monospace">{c.referenceCode}</Typography></TableCell>
                     <TableCell>{c.cargoType}</TableCell>
-                    <TableCell>{c.originProvince} ← {c.destProvince}</TableCell>
+                    <TableCell>{c.announcements?.[0]?.hall?.name ?? 'سالن'} ← {c.destCity}</TableCell>
                     <TableCell>{c.weight} {c.unit}</TableCell>
                     <TableCell>{c.fare ? `${c.fare.toLocaleString('fa-IR')} ریال` : <Chip label="تعیین نشده" size="small" />}</TableCell>
                     <TableCell>{toJalaliDateTime(c.loadingDateTime)}</TableCell>

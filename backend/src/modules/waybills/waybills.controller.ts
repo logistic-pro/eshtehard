@@ -110,9 +110,10 @@ export async function getWaybillPdf(req: Request, res: Response, next: NextFunct
       res.status(500).json({ message: `فونت PDF یافت نشد (${REGULAR})` }); return;
     }
 
-    // Use server-side PdfPrinter (NOT pdfmake/build/pdfmake which is browser-only)
+    // Use server-side PdfPrinter — pdfmake/src/printer reads from filesystem
+    // require('pdfmake') resolves to build/pdfmake.js (browser VFS build) and crashes
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const PdfPrinter = require('pdfmake');
+    const PdfPrinter = require('pdfmake/src/printer');
     const printer = new PdfPrinter({
       Vazirmatn: {
         normal:      REGULAR,

@@ -165,11 +165,12 @@ export class CargoService {
   }
 
   private async list(filters: Record<string, string>, extraWhere?: Prisma.CargoWhereInput) {
-    const { status, province, page = '1', limit = '20' } = filters;
+    const { status, province, destCity, page = '1', limit = '20' } = filters;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const where: Prisma.CargoWhereInput = { ...extraWhere };
     if (status) where.status = status as CargoStatus;
     if (province) where.originProvince = { contains: province, mode: 'insensitive' };
+    if (destCity) where.destCity = { contains: destCity, mode: 'insensitive' };
 
     const [items, total] = await Promise.all([
       prisma.cargo.findMany({
@@ -180,6 +181,7 @@ export class CargoService {
         include: {
           producer: { include: { user: { select: { name: true, phone: true } } } },
           freight: { include: { user: { select: { name: true, phone: true } } } },
+          announcements: { take: 1, include: { hall: { select: { name: true } } } },
           appointments: {
             where: { status: 'CONFIRMED' },
             take: 1,
