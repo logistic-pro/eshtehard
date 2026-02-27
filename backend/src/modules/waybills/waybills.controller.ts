@@ -113,7 +113,7 @@ export async function getWaybillPdf(req: Request, res: Response, next: NextFunct
     const vehicle = driver.vehicles[0];
     const boldFont = boldExists ? BOLD : REGULAR;
 
-    const doc = new PDFDocument({ size: 'A4', rtl: true, margins: { top: 50, bottom: 50, left: 40, right: 40 } });
+    const doc = new PDFDocument({ size: 'A4', margins: { top: 50, bottom: 50, left: 40, right: 40 } });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=waybill-${waybill.waybillNumber}.pdf`);
