@@ -14,6 +14,15 @@ import { fa } from '../../i18n/fa';
 
 const STATUSES = ['DRAFT','SUBMITTED','ACCEPTED_BY_FREIGHT','ANNOUNCED_TO_HALL','DRIVER_ASSIGNED','IN_TRANSIT','DELIVERED','CANCELLED'];
 
+type CargoRow = {
+  id: string; referenceCode: string; cargoType: string;
+  originProvince: string; destProvince: string; weight: number; unit: string;
+  fare?: number; status: string; loadingDateTime?: string;
+  producer?: { user: { name: string; phone: string } };
+  freight?: { user: { name: string } };
+  appointments?: { driver: { user: { name: string; phone: string }; vehicles: { plate: string }[] } }[];
+};
+
 export default function TerminalCargoMonitor() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
@@ -70,14 +79,7 @@ export default function TerminalCargoMonitor() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {items.map((c: {
-                  id: string; referenceCode: string; cargoType: string;
-                  originProvince: string; destProvince: string; weight: number; unit: string;
-                  fare?: number; status: string; loadingDateTime?: string;
-                  producer?: { user: { name: string; phone: string } };
-                  freight?: { user: { name: string } };
-                  appointments?: { driver: { user: { name: string; phone: string }; vehicles: { plate: string }[] } }[];
-                }) => {
+                {items.map((c: CargoRow) => {
                   const driver = c.appointments?.[0]?.driver;
                   return (
                   <TableRow key={c.id} hover>
