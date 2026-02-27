@@ -37,6 +37,7 @@ import TerminalProducerMonitor from '../pages/terminal/ProducerMonitor';
 import TerminalHallManager from '../pages/terminal/HallManager';
 import TerminalUserManagement from '../pages/terminal/UserManagement';
 import TerminalReports from '../pages/terminal/Reports';
+import TerminalAuditLog from '../pages/terminal/AuditLog';
 
 function RoleRedirect() {
   const { user } = useSelector((s: RootState) => s.auth);
@@ -91,6 +92,7 @@ export default function AppRouter() {
       <Route path="/terminal/halls" element={<ProtectedRoute roles={['TERMINAL_ADMIN']}><TerminalHallManager /></ProtectedRoute>} />
       <Route path="/terminal/users" element={<ProtectedRoute roles={['TERMINAL_ADMIN']}><TerminalUserManagement /></ProtectedRoute>} />
       <Route path="/terminal/reports" element={<ProtectedRoute roles={['TERMINAL_ADMIN']}><TerminalReports /></ProtectedRoute>} />
+      <Route path="/terminal/audit-log" element={<ProtectedRoute roles={['TERMINAL_ADMIN']}><TerminalAuditLog /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

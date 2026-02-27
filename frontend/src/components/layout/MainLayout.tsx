@@ -20,6 +20,7 @@ import FactoryIcon from '@mui/icons-material/Factory';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
+import HistoryIcon from '@mui/icons-material/History';
 import { RootState } from '../../store';
 import { logout } from '../../store/authSlice';
 import { authService } from '../../services/auth.service';
@@ -56,6 +57,7 @@ const NAV: Record<string, { label: string; path: string; icon: React.ReactNode }
     { label: 'سالن‌ها', path: '/terminal/halls', icon: <MeetingRoomIcon /> },
     { label: 'کاربران', path: '/terminal/users', icon: <AccountCircleIcon /> },
     { label: 'گزارشات', path: '/terminal/reports', icon: <AssessmentIcon /> },
+    { label: 'لاگ سیستم', path: '/terminal/audit-log', icon: <HistoryIcon /> },
   ],
 };
 

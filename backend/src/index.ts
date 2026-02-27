@@ -21,6 +21,7 @@ import fleetRoutes from './modules/fleet/fleet.routes';
 import reportRoutes from './modules/reports/reports.routes';
 import ticketRoutes from './modules/tickets/tickets.routes';
 import notificationRoutes from './modules/notifications/notifications.routes';
+import auditRoutes from './modules/audit/audit.routes';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -50,6 +51,7 @@ app.use('/api/v1/fleet', fleetRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/tickets', ticketRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/audit-logs', auditRoutes);
 
 app.get('/api/v1/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

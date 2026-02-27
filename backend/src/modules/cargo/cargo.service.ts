@@ -178,8 +178,13 @@ export class CargoService {
         take: parseInt(limit),
         orderBy: { createdAt: 'desc' },
         include: {
-          producer: { include: { user: { select: { name: true } } } },
-          freight: { include: { user: { select: { name: true } } } },
+          producer: { include: { user: { select: { name: true, phone: true } } } },
+          freight: { include: { user: { select: { name: true, phone: true } } } },
+          appointments: {
+            where: { status: 'CONFIRMED' },
+            take: 1,
+            include: { driver: { include: { user: { select: { name: true, phone: true } }, vehicles: { take: 1 } } } },
+          },
         },
       }),
       prisma.cargo.count({ where }),

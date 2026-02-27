@@ -88,6 +88,10 @@ export class AuthService {
       data: { token: refreshToken, userId: user.id, expiresAt },
     });
 
+    await prisma.auditLog.create({
+      data: { userId: user.id, action: 'LOGIN', entityType: 'User', entityId: user.id, meta: { phone: user.phone, role: user.role } },
+    }).catch(() => null);
+
     return {
       accessToken,
       user: {

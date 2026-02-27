@@ -5,21 +5,9 @@ import { toJalaliDateTime } from '../../utils/farsiDate';
 import fs from 'fs';
 import path from 'path';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const PdfPrinter = require('@digicole/pdfmake-rtl');
-
 const FONT_DIR = path.join(__dirname, '../../assets/fonts');
-const REGULAR_FONT = path.join(FONT_DIR, 'Vazirmatn-Regular.ttf');
-const BOLD_FONT = path.join(FONT_DIR, 'Vazirmatn-Bold.ttf');
-
-function buildPrinter() {
-  const regular = fs.existsSync(REGULAR_FONT) ? REGULAR_FONT : undefined;
-  const bold = fs.existsSync(BOLD_FONT) ? BOLD_FONT : (regular ?? undefined);
-  if (!regular) return null;
-  return new PdfPrinter({
-    Vazirmatn: { normal: regular, bold, italics: regular, bolditalics: bold },
-  });
-}
+const REGULAR = path.join(FONT_DIR, 'Vazirmatn-Regular.ttf');
+const BOLD    = path.join(FONT_DIR, 'Vazirmatn-Bold.ttf');
 
 export async function createWaybill(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -38,7 +26,7 @@ export async function createWaybill(req: Request, res: Response, next: NextFunct
       res.status(400).json({ message: 'فقط برای نوبت‌های تأیید شده می‌توان حواله صادر کرد' }); return;
     }
 
-    // Create waybill — cargo stays DRIVER_ASSIGNED until driver starts moving
+    // Waybill issued — cargo stays DRIVER_ASSIGNED until driver picks up
     const waybill = await prisma.waybill.create({
       data: { cargoId: appt.cargoId, appointmentId },
       include: { cargo: true, appointment: { include: { driver: { include: { user: true } } } } },
@@ -59,7 +47,7 @@ export async function listWaybills(req: Request, res: Response, next: NextFuncti
         take: parseInt(limit),
         orderBy: { createdAt: 'desc' },
         include: {
-          cargo: { select: { referenceCode: true, cargoType: true, originProvince: true, destProvince: true, weight: true } },
+          cargo: { select: { referenceCode: true, cargoType: true, originProvince: true, destProvince: true, weight: true, unit: true } },
           appointment: {
             include: { driver: { include: { user: { select: { name: true, phone: true } } } } },
           },
@@ -92,115 +80,101 @@ export async function getWaybillPdf(req: Request, res: Response, next: NextFunct
 
     if (!waybill) { res.status(404).json({ message: 'حواله یافت نشد' }); return; }
 
-    const printer = buildPrinter();
-    if (!printer) {
-      res.status(500).json({ message: 'فونت PDF یافت نشد' }); return;
+    const regularExists = fs.existsSync(REGULAR);
+    const boldExists    = fs.existsSync(BOLD);
+
+    if (!regularExists) {
+      res.status(500).json({ message: 'فونت PDF یافت نشد — لطفاً مجدد deploy کنید' }); return;
     }
 
-    const cargo = waybill.cargo;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfMake = require('pdfmake/build/pdfmake');
+    pdfMake.fonts = {
+      Vazirmatn: {
+        normal:      REGULAR,
+        bold:        boldExists ? BOLD : REGULAR,
+        italics:     REGULAR,
+        bolditalics: boldExists ? BOLD : REGULAR,
+      },
+    };
+
+    const cargo  = waybill.cargo;
     const driver = waybill.appointment.driver;
     const vehicle = driver.vehicles[0];
 
-    // Helper: a two-column row (label | value) — both in Persian, auto-RTL by pdfmake-rtl
+    const R = 'right' as const;
+    const C = 'center' as const;
+
+    // Two-column row: label (bold, right) | value (right)
     const row = (label: string, value: string) => ({
       columns: [
-        { text: value, alignment: 'right', width: '*' },
-        { text: label, alignment: 'right', width: 120, bold: true, color: '#555' },
+        { text: value, alignment: R, width: '*' },
+        { text: label, alignment: R, bold: true, color: '#444', width: 130 },
       ],
-      columnGap: 8,
-      margin: [0, 2, 0, 2] as [number, number, number, number],
+      columnGap: 10,
+      margin: [0, 3, 0, 3] as [number,number,number,number],
     });
 
-    const separator = {
+    const divider = {
       canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#ccc' }],
-      margin: [0, 6, 0, 6] as [number, number, number, number],
+      margin: [0, 6, 0, 8] as [number,number,number,number],
     };
 
-    const sectionTitle = (text: string) => ({
-      text,
-      fontSize: 13,
-      bold: true,
-      color: '#1a237e',
-      alignment: 'right',
-      margin: [0, 8, 0, 4] as [number, number, number, number],
+    const section = (title: string) => ({
+      text: title, fontSize: 13, bold: true, color: '#1a237e', alignment: R,
+      margin: [0, 6, 0, 4] as [number,number,number,number],
     });
 
-    const docDefinition = {
-      pageSize: 'A4',
-      pageMargins: [40, 60, 40, 60] as [number, number, number, number],
-      defaultStyle: { font: 'Vazirmatn', fontSize: 11 },
+    const docDef = {
+      defaultStyle: { font: 'Vazirmatn', fontSize: 11, rtl: true },
+      pageMargins: [40, 50, 40, 50] as [number,number,number,number],
       content: [
-        // Title
-        {
-          text: 'حواله الکترونیکی بار',
-          fontSize: 20,
-          bold: true,
-          color: '#1a237e',
-          alignment: 'center',
-          margin: [0, 0, 0, 4] as [number, number, number, number],
-        },
-        {
-          canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 2, lineColor: '#1a237e' }],
-          margin: [0, 0, 0, 12] as [number, number, number, number],
-        },
+        { text: 'حواله الکترونیکی بار', fontSize: 20, bold: true, color: '#1a237e', alignment: C, margin: [0,0,0,4] as [number,number,number,number] },
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 2, lineColor: '#1a237e' }], margin: [0,0,0,12] as [number,number,number,number] },
 
-        // Cargo section
-        sectionTitle('اطلاعات بار'),
-        separator,
+        section('اطلاعات بار'),
+        divider,
         row('شماره حواله', waybill.waybillNumber),
-        row('کد مرجع بار', cargo.referenceCode),
+        row('کد مرجع', cargo.referenceCode),
         row('نوع بار', cargo.cargoType),
         row('وزن', `${cargo.weight} ${cargo.unit}`),
         row('مبدأ', `${cargo.originProvince} - ${cargo.originCity}`),
         row('مقصد', `${cargo.destProvince} - ${cargo.destCity}`),
-        ...(cargo.fare ? [row('کرایه', `${cargo.fare.toLocaleString()} ریال`)] : []),
+        ...(cargo.fare ? [row('کرایه (ریال)', cargo.fare.toLocaleString())] : []),
+        divider,
 
-        separator,
-
-        // Driver section
-        sectionTitle('اطلاعات راننده'),
-        separator,
+        section('اطلاعات راننده'),
+        divider,
         row('نام راننده', driver.user.name),
-        row('تلفن راننده', driver.user.phone),
+        row('موبایل راننده', driver.user.phone),
         ...(vehicle ? [
           row('پلاک خودرو', vehicle.plate),
           row('نوع خودرو', vehicle.vehicleType),
         ] : []),
+        divider,
 
-        separator,
-
-        // Parties
         ...(cargo.producer ? [
-          sectionTitle('اطلاعات تولیدکننده'),
-          separator,
+          section('تولیدکننده / فرستنده'),
+          divider,
           row('نام', cargo.producer.user.name),
-          row('تلفن', cargo.producer.user.phone),
-          separator,
+          row('موبایل', cargo.producer.user.phone),
+          divider,
         ] : []),
 
-        // Dates
-        sectionTitle('تاریخ‌ها'),
-        separator,
+        section('تاریخ‌ها'),
+        divider,
         row('تاریخ صدور حواله', toJalaliDateTime(waybill.issuedAt)),
         row('تاریخ نوبت بارگیری', waybill.appointment.appointmentDate
           ? toJalaliDateTime(waybill.appointment.appointmentDate) : '-'),
 
-        // Footer
-        {
-          text: 'سامانه مدیریت پایانه بار اشتهارد',
-          fontSize: 9,
-          color: '#999',
-          alignment: 'center',
-          margin: [0, 30, 0, 0] as [number, number, number, number],
-        },
+        { text: 'سامانه مدیریت پایانه بار اشتهارد', fontSize: 9, color: '#999', alignment: C, margin: [0, 30, 0, 0] as [number,number,number,number] },
       ],
     };
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=waybill-${waybill.waybillNumber}.pdf`);
 
-    const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    pdfDoc.pipe(res);
-    pdfDoc.end();
+    const pdfDoc = pdfMake.createPdf(docDef);
+    pdfDoc.getBuffer((buffer: Buffer) => res.send(buffer));
   } catch (err) { next(err); }
 }

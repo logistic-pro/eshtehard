@@ -66,6 +66,7 @@ export default function TerminalCargoMonitor() {
                   <TableCell>وضعیت</TableCell>
                   <TableCell>تولیدی</TableCell>
                   <TableCell>باربری</TableCell>
+                  <TableCell>راننده</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -73,9 +74,12 @@ export default function TerminalCargoMonitor() {
                   id: string; referenceCode: string; cargoType: string;
                   originProvince: string; destProvince: string; weight: number; unit: string;
                   fare?: number; status: string; loadingDateTime?: string;
-                  producer?: { user: { name: string } };
+                  producer?: { user: { name: string; phone: string } };
                   freight?: { user: { name: string } };
-                }) => (
+                  appointments?: { driver: { user: { name: string; phone: string }; vehicles: { plate: string }[] } }[];
+                }) => {
+                  const driver = c.appointments?.[0]?.driver;
+                  return (
                   <TableRow key={c.id} hover>
                     <TableCell><Typography variant="caption" fontFamily="monospace">{c.referenceCode}</Typography></TableCell>
                     <TableCell>{c.cargoType}</TableCell>
@@ -86,7 +90,18 @@ export default function TerminalCargoMonitor() {
                     <TableCell><StatusChip status={c.status} /></TableCell>
                     <TableCell>{c.producer?.user?.name ?? '-'}</TableCell>
                     <TableCell>{c.freight?.user?.name ?? '-'}</TableCell>
+                    <TableCell>
+                      {driver ? (
+                        <Box>
+                          <Typography variant="body2">{driver.user.name}</Typography>
+                          <Typography variant="caption" color="text.secondary" dir="ltr">{driver.user.phone}</Typography>
+                          {driver.vehicles[0] && <Typography variant="caption" display="block" dir="ltr">{driver.vehicles[0].plate}</Typography>}
+                        </Box>
+                      ) : '-'}
+                    </TableCell>
                   </TableRow>
+                  );
+                }
                 ))}
                 {items.length === 0 && (
                   <TableRow><TableCell colSpan={9} align="center">
