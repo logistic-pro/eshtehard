@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Card, CardContent, Typography, Button, Grid, Divider,
-  Alert, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
+  Alert, Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DownloadIcon from '@mui/icons-material/Download';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import CancelIcon from '@mui/icons-material/Cancel';
 import MainLayout from '../../components/layout/MainLayout';
 import PageHeader from '../../components/ui/PageHeader';
@@ -18,8 +19,88 @@ import { appointmentsService } from '../../services/appointments.service';
 import { waybillsService } from '../../services/waybills.service';
 import { toJalaliDateTime } from '../../utils/jalali';
 
+type WaybillDetail = {
+  id: string;
+  waybillNumber: string;
+  issuedAt: string;
+  cargo: {
+    referenceCode: string; cargoType: string;
+    originProvince: string; originCity: string;
+    destProvince: string; destCity: string;
+    weight: number; unit: string; fare?: number;
+    producer?: { user: { name: string; phone: string } };
+    freight?: { user: { name: string; phone: string } };
+  };
+  appointment: {
+    appointmentDate?: string;
+    driver: { user: { name: string; phone: string }; vehicles: { plate: string; vehicleType: string }[] };
+  };
+};
+
+function WaybillViewDialog({ waybillId, onClose }: { waybillId: string; onClose: () => void }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['waybill', waybillId],
+    queryFn: () => waybillsService.get(waybillId),
+  });
+  const w: WaybillDetail | undefined = data?.data;
+
+  const row = (label: string, value?: string | number | null) => (
+    <Box display="flex" justifyContent="space-between" py={0.5} borderBottom="1px solid #f0f0f0">
+      <Typography variant="body2" color="text.secondary">{label}</Typography>
+      <Typography variant="body2" fontWeight={500}>{value ?? '-'}</Typography>
+    </Box>
+  );
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>جزئیات حواله الکترونیکی</DialogTitle>
+      <DialogContent>
+        {isLoading && <LoadingSpinner />}
+        {w && (
+          <Box mt={1}>
+            <Typography variant="subtitle2" color="primary" mb={1}>اطلاعات بار</Typography>
+            {row('شماره حواله', w.waybillNumber)}
+            {row('کد مرجع', w.cargo.referenceCode)}
+            {row('نوع بار', w.cargo.cargoType)}
+            {row('وزن', `${w.cargo.weight} ${w.cargo.unit}`)}
+            {row('مبدأ', `${w.cargo.originProvince} - ${w.cargo.originCity}`)}
+            {row('مقصد', `${w.cargo.destProvince} - ${w.cargo.destCity}`)}
+            {w.cargo.fare && row('کرایه (ریال)', w.cargo.fare.toLocaleString('fa-IR'))}
+
+            <Divider sx={{ my: 1.5 }} />
+            <Typography variant="subtitle2" color="primary" mb={1}>اطلاعات راننده</Typography>
+            {row('نام راننده', w.appointment.driver.user.name)}
+            {row('موبایل', w.appointment.driver.user.phone)}
+            {w.appointment.driver.vehicles[0] && row('پلاک خودرو', w.appointment.driver.vehicles[0].plate)}
+
+            {w.cargo.producer && (<>
+              <Divider sx={{ my: 1.5 }} />
+              <Typography variant="subtitle2" color="primary" mb={1}>تولیدکننده / فرستنده</Typography>
+              {row('نام', w.cargo.producer.user.name)}
+              {row('موبایل', w.cargo.producer.user.phone)}
+            </>)}
+
+            <Divider sx={{ my: 1.5 }} />
+            <Typography variant="subtitle2" color="primary" mb={1}>تاریخ‌ها</Typography>
+            {row('تاریخ صدور', toJalaliDateTime(w.issuedAt))}
+            {row('تاریخ نوبت', toJalaliDateTime(w.appointment.appointmentDate))}
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => waybillId && waybillsService.downloadPdf(waybillId, w?.waybillNumber)}
+          startIcon={<DownloadIcon />} variant="outlined">
+          دریافت PDF
+        </Button>
+        <Button onClick={onClose} variant="contained">بستن</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 export default function DriverAppointments() {
   const [cancelDialog, setCancelDialog] = useState<string | null>(null);
+  const [viewWaybill, setViewWaybill] = useState<string | null>(null);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -93,10 +174,8 @@ export default function DriverAppointments() {
                 )}
                 <Typography variant="caption" color="text.secondary" fontFamily="monospace">{a.cargo.referenceCode}</Typography>
 
-                {/* Driver action buttons — status change */}
                 {a.status === 'CONFIRMED' && (
                   <Box mt={1.5} display="flex" gap={1} flexWrap="wrap">
-                    {/* DRIVER_ASSIGNED: must wait for waybill before loading */}
                     {a.cargo.status === 'DRIVER_ASSIGNED' && !a.waybill && (
                       <Alert severity="warning" sx={{ py: 0.5, width: '100%' }}>
                         منتظر صدور حواله توسط باربری باشید — تا صدور حواله نمی‌توانید بارگیری کنید
@@ -129,10 +208,14 @@ export default function DriverAppointments() {
                 )}
 
                 {a.waybill && (
-                  <Box mt={1.5}>
+                  <Box mt={1.5} display="flex" gap={1} flexWrap="wrap">
+                    <Button size="small" variant="outlined" startIcon={<VisibilityIcon />}
+                      onClick={() => setViewWaybill(a.waybill!.id)}>
+                      مشاهده حواله
+                    </Button>
                     <Button size="small" variant="outlined" color="error" startIcon={<DownloadIcon />}
                       onClick={() => waybillsService.downloadPdf(a.waybill!.id)}>
-                      دریافت حواله PDF
+                      دریافت PDF
                     </Button>
                   </Box>
                 )}
@@ -141,6 +224,10 @@ export default function DriverAppointments() {
           </Grid>
         ))}
       </Grid>
+
+      {viewWaybill && (
+        <WaybillViewDialog waybillId={viewWaybill} onClose={() => setViewWaybill(null)} />
+      )}
 
       <Dialog open={!!cancelDialog} onClose={() => setCancelDialog(null)} maxWidth="xs" fullWidth>
         <DialogTitle>لغو نوبت</DialogTitle>

@@ -12,11 +12,25 @@ import { toJalaliDateTime } from '../../utils/jalali';
 
 const ACTIONS = ['LOGIN','CARGO_DRAFT','CARGO_SUBMITTED','CARGO_ACCEPTED_BY_FREIGHT','CARGO_ANNOUNCED_TO_HALL','CARGO_DRIVER_ASSIGNED','CARGO_IN_TRANSIT','CARGO_DELIVERED','CARGO_CANCELLED'];
 
+const ACTION_FA: Record<string, string> = {
+  LOGIN: 'ورود به سامانه',
+  CARGO_DRAFT: 'ایجاد بار',
+  CARGO_SUBMITTED: 'ارسال به باربری',
+  CARGO_ACCEPTED_BY_FREIGHT: 'پذیرش توسط باربری',
+  CARGO_ANNOUNCED_TO_HALL: 'اعلان در سالن',
+  CARGO_DRIVER_ASSIGNED: 'تخصیص راننده',
+  CARGO_IN_TRANSIT: 'شروع حمل',
+  CARGO_DELIVERED: 'تحویل بار',
+  CARGO_CANCELLED: 'لغو بار',
+};
+
 const ACTION_COLORS: Record<string, 'default' | 'primary' | 'success' | 'error' | 'warning' | 'info'> = {
   LOGIN: 'info',
   CARGO_DELIVERED: 'success',
   CARGO_CANCELLED: 'error',
   CARGO_IN_TRANSIT: 'warning',
+  CARGO_SUBMITTED: 'primary',
+  CARGO_ACCEPTED_BY_FREIGHT: 'primary',
 };
 
 export default function TerminalAuditLog() {
@@ -42,7 +56,7 @@ export default function TerminalAuditLog() {
           <InputLabel>نوع رویداد</InputLabel>
           <Select value={action} label="نوع رویداد" onChange={e => { setAction(e.target.value); setPage(1); }}>
             <MenuItem value="">همه</MenuItem>
-            {ACTIONS.map(a => <MenuItem key={a} value={a}>{a}</MenuItem>)}
+            {ACTIONS.map(a => <MenuItem key={a} value={a}>{ACTION_FA[a] ?? a}</MenuItem>)}
           </Select>
         </FormControl>
       </Card>
@@ -79,7 +93,7 @@ export default function TerminalAuditLog() {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Chip label={log.action} size="small"
+                      <Chip label={ACTION_FA[log.action] ?? log.action} size="small"
                         color={ACTION_COLORS[log.action] ?? 'default'} />
                     </TableCell>
                     <TableCell>{log.user?.name ?? '-'}</TableCell>

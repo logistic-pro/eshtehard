@@ -2,6 +2,7 @@ import api from './api';
 
 export const waybillsService = {
   list: (params?: Record<string, string>) => api.get('/waybills', { params }),
+  get: (id: string) => api.get(`/waybills/${id}`),
   create: (appointmentId: string) => api.post('/waybills', { appointmentId }),
   downloadPdf: async (id: string, waybillNumber?: string) => {
     const res = await api.get(`/waybills/${id}/pdf`, { responseType: 'blob' });

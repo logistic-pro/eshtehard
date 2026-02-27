@@ -5,7 +5,7 @@ import { toJalaliDateTime } from '../../utils/farsiDate';
 import fs from 'fs';
 import path from 'path';
 
-const FONT_DIR = path.join(__dirname, '../../assets/fonts');
+const FONT_DIR = path.join(process.cwd(), 'assets/fonts');
 const REGULAR = path.join(FONT_DIR, 'Vazirmatn-Regular.ttf');
 const BOLD    = path.join(FONT_DIR, 'Vazirmatn-Bold.ttf');
 
@@ -56,6 +56,29 @@ export async function listWaybills(req: Request, res: Response, next: NextFuncti
       prisma.waybill.count(),
     ]);
     res.json({ items, total, page: parseInt(page), limit: parseInt(limit) });
+  } catch (err) { next(err); }
+}
+
+export async function getWaybill(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const waybill = await prisma.waybill.findUnique({
+      where: { id: req.params.id },
+      include: {
+        cargo: {
+          include: {
+            producer: { include: { user: { select: { name: true, phone: true } } } },
+            freight: { include: { user: { select: { name: true, phone: true } } } },
+          },
+        },
+        appointment: {
+          include: {
+            driver: { include: { user: { select: { name: true, phone: true } }, vehicles: true } },
+          },
+        },
+      },
+    });
+    if (!waybill) { res.status(404).json({ message: 'حواله یافت نشد' }); return; }
+    res.json(waybill);
   } catch (err) { next(err); }
 }
 

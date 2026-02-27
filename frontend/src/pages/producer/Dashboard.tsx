@@ -9,6 +9,7 @@ import MainLayout from '../../components/layout/MainLayout';
 import StatCard from '../../components/ui/StatCard';
 import UserInfoBanner from '../../components/ui/UserInfoBanner';
 import { cargoService } from '../../services/cargo.service';
+import { fa } from '../../i18n/fa';
 
 export default function ProducerDashboard() {
   const navigate = useNavigate();
@@ -45,7 +46,7 @@ export default function ProducerDashboard() {
             <Box key={c.id} display="flex" justifyContent="space-between" py={1} borderBottom="1px solid #eee">
               <Typography>{c.cargoType}</Typography>
               <Typography variant="body2" color="text.secondary">{c.referenceCode}</Typography>
-              <Typography variant="body2">{c.status}</Typography>
+              <Typography variant="body2">{fa[c.status as keyof typeof fa] ?? c.status}</Typography>
             </Box>
           ))}
           {items.length === 0 && <Typography color="text.secondary">هنوز باری ثبت نشده است</Typography>}
