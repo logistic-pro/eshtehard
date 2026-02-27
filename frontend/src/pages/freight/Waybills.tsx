@@ -5,7 +5,7 @@ import {
   Typography, Button, IconButton, Tooltip, Pagination, Alert, Dialog,
   DialogTitle, DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import PrintIcon from '@mui/icons-material/Print';
 import AddIcon from '@mui/icons-material/Add';
 import MainLayout from '../../components/layout/MainLayout';
 import PageHeader from '../../components/ui/PageHeader';
@@ -13,6 +13,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { waybillsService } from '../../services/waybills.service';
 import { appointmentsService } from '../../services/appointments.service';
 import { toJalaliDate } from '../../utils/jalali';
+import { printWaybill } from '../../utils/printWaybill';
 
 interface ApptOption {
   id: string;
@@ -92,9 +93,10 @@ export default function FreightWaybills() {
                 <TableCell>{w.appointment?.driver?.user?.name ?? '-'}</TableCell>
                 <TableCell>{toJalaliDate(w.issuedAt)}</TableCell>
                 <TableCell align="center">
-                  <Tooltip title="دریافت PDF">
-                    <IconButton size="small" color="error" onClick={() => waybillsService.downloadPdf(w.id, w.waybillNumber)}>
-                      <PictureAsPdfIcon fontSize="small" />
+                  <Tooltip title="چاپ / ذخیره PDF">
+                    <IconButton size="small" color="primary"
+                      onClick={async () => { const r = await waybillsService.get(w.id); printWaybill(r.data); }}>
+                      <PrintIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
                 </TableCell>
