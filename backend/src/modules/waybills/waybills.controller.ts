@@ -47,9 +47,9 @@ export async function listWaybills(req: Request, res: Response, next: NextFuncti
         take: parseInt(limit),
         orderBy: { createdAt: 'desc' },
         include: {
-          cargo: { select: { referenceCode: true, cargoType: true, originProvince: true, destProvince: true, weight: true, unit: true } },
+          cargo: { select: { referenceCode: true, cargoType: true, originProvince: true, destProvince: true, weight: true, unit: true, fare: true } },
           appointment: {
-            include: { driver: { include: { user: { select: { name: true, phone: true } } } } },
+            include: { driver: { include: { user: { select: { name: true, phone: true } }, vehicles: { take: 1 } } } },
           },
         },
       }),
@@ -107,53 +107,53 @@ export async function getWaybillPdf(req: Request, res: Response, next: NextFunct
     const boldExists    = fs.existsSync(BOLD);
 
     if (!regularExists) {
-      res.status(500).json({ message: 'فونت PDF یافت نشد — لطفاً مجدد deploy کنید' }); return;
+      res.status(500).json({ message: `فونت PDF یافت نشد (${REGULAR})` }); return;
     }
 
+    // Use server-side PdfPrinter (NOT pdfmake/build/pdfmake which is browser-only)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfMake = require('pdfmake/build/pdfmake');
-    pdfMake.fonts = {
+    const PdfPrinter = require('pdfmake');
+    const printer = new PdfPrinter({
       Vazirmatn: {
         normal:      REGULAR,
         bold:        boldExists ? BOLD : REGULAR,
         italics:     REGULAR,
         bolditalics: boldExists ? BOLD : REGULAR,
       },
-    };
+    });
 
-    const cargo  = waybill.cargo;
-    const driver = waybill.appointment.driver;
+    const cargo   = waybill.cargo;
+    const driver  = waybill.appointment.driver;
     const vehicle = driver.vehicles[0];
 
     const R = 'right' as const;
     const C = 'center' as const;
 
-    // Two-column row: label (bold, right) | value (right)
     const row = (label: string, value: string) => ({
       columns: [
         { text: value, alignment: R, width: '*' },
         { text: label, alignment: R, bold: true, color: '#444', width: 130 },
       ],
       columnGap: 10,
-      margin: [0, 3, 0, 3] as [number,number,number,number],
+      margin: [0, 3, 0, 3] as [number, number, number, number],
     });
 
     const divider = {
       canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#ccc' }],
-      margin: [0, 6, 0, 8] as [number,number,number,number],
+      margin: [0, 6, 0, 8] as [number, number, number, number],
     };
 
     const section = (title: string) => ({
       text: title, fontSize: 13, bold: true, color: '#1a237e', alignment: R,
-      margin: [0, 6, 0, 4] as [number,number,number,number],
+      margin: [0, 6, 0, 4] as [number, number, number, number],
     });
 
     const docDef = {
       defaultStyle: { font: 'Vazirmatn', fontSize: 11, rtl: true },
-      pageMargins: [40, 50, 40, 50] as [number,number,number,number],
+      pageMargins: [40, 50, 40, 50] as [number, number, number, number],
       content: [
-        { text: 'حواله الکترونیکی بار', fontSize: 20, bold: true, color: '#1a237e', alignment: C, margin: [0,0,0,4] as [number,number,number,number] },
-        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 2, lineColor: '#1a237e' }], margin: [0,0,0,12] as [number,number,number,number] },
+        { text: 'حواله الکترونیکی بار', fontSize: 20, bold: true, color: '#1a237e', alignment: C, margin: [0, 0, 0, 4] as [number, number, number, number] },
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 2, lineColor: '#1a237e' }], margin: [0, 0, 0, 12] as [number, number, number, number] },
 
         section('اطلاعات بار'),
         divider,
@@ -190,14 +190,16 @@ export async function getWaybillPdf(req: Request, res: Response, next: NextFunct
         row('تاریخ نوبت بارگیری', waybill.appointment.appointmentDate
           ? toJalaliDateTime(waybill.appointment.appointmentDate) : '-'),
 
-        { text: 'سامانه مدیریت پایانه بار اشتهارد', fontSize: 9, color: '#999', alignment: C, margin: [0, 30, 0, 0] as [number,number,number,number] },
+        { text: 'سامانه مدیریت پایانه بار اشتهارد', fontSize: 9, color: '#999', alignment: C, margin: [0, 30, 0, 0] as [number, number, number, number] },
       ],
     };
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=waybill-${waybill.waybillNumber}.pdf`);
 
-    const pdfDoc = pdfMake.createPdf(docDef);
-    pdfDoc.getBuffer((buffer: Buffer) => res.send(buffer));
+    // Stream PDF directly to response (server-side pdfmake uses pdfkit streaming)
+    const pdfDoc = printer.createPdfKitDocument(docDef);
+    pdfDoc.pipe(res);
+    pdfDoc.end();
   } catch (err) { next(err); }
 }

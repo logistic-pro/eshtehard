@@ -56,6 +56,7 @@ const NAV: Record<string, { label: string; path: string; icon: React.ReactNode }
     { label: 'پایش تولیدی‌ها', path: '/terminal/producers', icon: <FactoryIcon /> },
     { label: 'سالن‌ها', path: '/terminal/halls', icon: <MeetingRoomIcon /> },
     { label: 'کاربران', path: '/terminal/users', icon: <AccountCircleIcon /> },
+    { label: 'حواله‌ها', path: '/terminal/waybills', icon: <DescriptionIcon /> },
     { label: 'گزارشات', path: '/terminal/reports', icon: <AssessmentIcon /> },
     { label: 'لاگ سیستم', path: '/terminal/audit-log', icon: <HistoryIcon /> },
   ],
