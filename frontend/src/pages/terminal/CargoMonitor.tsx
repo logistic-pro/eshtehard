@@ -103,8 +103,7 @@ export default function TerminalCargoMonitor() {
                     </TableCell>
                   </TableRow>
                   );
-                }
-                ))}
+                })}
                 {items.length === 0 && (
                   <TableRow><TableCell colSpan={9} align="center">
                     <Typography color="text.secondary" py={3}>باری یافت نشد</Typography>
