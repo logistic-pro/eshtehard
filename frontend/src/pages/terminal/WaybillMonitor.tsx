@@ -5,13 +5,14 @@ import {
   Typography, Pagination, Button, Dialog, DialogTitle, DialogContent,
   DialogActions, Divider,
 } from '@mui/material';
-import DownloadIcon from '@mui/icons-material/Download';
+import PrintIcon from '@mui/icons-material/Print';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import MainLayout from '../../components/layout/MainLayout';
 import PageHeader from '../../components/ui/PageHeader';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { waybillsService } from '../../services/waybills.service';
 import { toJalaliDateTime } from '../../utils/jalali';
+import { printWaybill } from '../../utils/printWaybill';
 
 type WaybillDetail = {
   id: string; waybillNumber: string; issuedAt: string;
@@ -88,9 +89,9 @@ function WaybillDetailDialog({ waybillId, onClose }: { waybillId: string; onClos
       </DialogContent>
       <DialogActions>
         {w && (
-          <Button startIcon={<DownloadIcon />} variant="outlined"
-            onClick={() => waybillsService.downloadPdf(w.id, w.waybillNumber)}>
-            دریافت PDF
+          <Button startIcon={<PrintIcon />} variant="outlined"
+            onClick={() => printWaybill(w)}>
+            چاپ / ذخیره PDF
           </Button>
         )}
         <Button onClick={onClose} variant="contained">بستن</Button>
@@ -154,8 +155,8 @@ export default function TerminalWaybillMonitor() {
                     <TableCell>
                       <Box display="flex" gap={0.5}>
                         <Button size="small" startIcon={<VisibilityIcon />} onClick={() => setViewId(w.id)}>مشاهده</Button>
-                        <Button size="small" color="error" startIcon={<DownloadIcon />}
-                          onClick={() => waybillsService.downloadPdf(w.id, w.waybillNumber)}>PDF</Button>
+                        <Button size="small" color="primary" startIcon={<PrintIcon />}
+                          onClick={async () => { const r = await waybillsService.get(w.id); printWaybill(r.data); }}>چاپ</Button>
                       </Box>
                     </TableCell>
                   </TableRow>

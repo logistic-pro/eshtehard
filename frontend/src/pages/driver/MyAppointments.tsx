@@ -8,7 +8,7 @@ import EventNoteIcon from '@mui/icons-material/EventNote';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import DownloadIcon from '@mui/icons-material/Download';
+import PrintIcon from '@mui/icons-material/Print';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CancelIcon from '@mui/icons-material/Cancel';
 import MainLayout from '../../components/layout/MainLayout';
@@ -18,6 +18,7 @@ import StatusChip from '../../components/ui/StatusChip';
 import { appointmentsService } from '../../services/appointments.service';
 import { waybillsService } from '../../services/waybills.service';
 import { toJalaliDateTime } from '../../utils/jalali';
+import { printWaybill } from '../../utils/printWaybill';
 
 type WaybillDetail = {
   id: string;
@@ -88,10 +89,11 @@ function WaybillViewDialog({ waybillId, onClose }: { waybillId: string; onClose:
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => waybillId && waybillsService.downloadPdf(waybillId, w?.waybillNumber)}
-          startIcon={<DownloadIcon />} variant="outlined">
-          دریافت PDF
-        </Button>
+        {w && (
+          <Button onClick={() => printWaybill(w)} startIcon={<PrintIcon />} variant="outlined">
+            چاپ / ذخیره PDF
+          </Button>
+        )}
         <Button onClick={onClose} variant="contained">بستن</Button>
       </DialogActions>
     </Dialog>
@@ -211,11 +213,7 @@ export default function DriverAppointments() {
                   <Box mt={1.5} display="flex" gap={1} flexWrap="wrap">
                     <Button size="small" variant="outlined" startIcon={<VisibilityIcon />}
                       onClick={() => setViewWaybill(a.waybill!.id)}>
-                      مشاهده حواله
-                    </Button>
-                    <Button size="small" variant="outlined" color="error" startIcon={<DownloadIcon />}
-                      onClick={() => waybillsService.downloadPdf(a.waybill!.id)}>
-                      دریافت PDF
+                      مشاهده / چاپ حواله
                     </Button>
                   </Box>
                 )}
